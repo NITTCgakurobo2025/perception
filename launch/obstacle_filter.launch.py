@@ -19,7 +19,7 @@ def generate_launch_description():
             name=[name, '_obstacle_filter'],
             output='screen',
             parameters=[{
-                'scan_topic': ['/', name, '/filtered_front_scan'],
+                'scan_topic': ['/', name, '/merged_scan'],
                 'transform_topic': ['/', name, '/scan_transform'],
                 'output_topic': ['/', name, '/transformed_scan'],
             }]

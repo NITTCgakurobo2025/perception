@@ -18,6 +18,14 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(localization_msgs REQUIRED)
 
+add_executable(obstacle_filter src/obstacle_filter.cpp)
+ament_target_dependencies(obstacle_filter rclcpp geometry_msgs localization_msgs)
+install(TARGETS obstacle_filter DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

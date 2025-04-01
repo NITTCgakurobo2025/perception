@@ -22,6 +22,10 @@ add_executable(obstacle_filter src/obstacle_filter.cpp)
 ament_target_dependencies(obstacle_filter rclcpp geometry_msgs localization_msgs)
 install(TARGETS obstacle_filter DESTINATION lib/${PROJECT_NAME})
 
+add_executable(obstacle_detector src/obstacle_detector.cpp)
+ament_target_dependencies(obstacle_detector rclcpp geometry_msgs localization_msgs)
+install(TARGETS obstacle_detector DESTINATION lib/${PROJECT_NAME})
+
 install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
 )

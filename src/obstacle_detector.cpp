@@ -13,8 +13,8 @@ public:
     ObstacleDetector() : Node("dbscan_cluster") {
         this->declare_parameter<std::string>("intput_topic", "/R1/transformed_scan");
         this->declare_parameter<std::string>("output_topic", "/R1/obstacles");
-        this->declare_parameter<double>("eps", 0.5);
-        this->declare_parameter<int>("min_points", 3);
+        this->declare_parameter<double>("eps", 0.8);
+        this->declare_parameter<int>("min_points", 5);
 
         intput_sub_ = this->create_subscription<localization_msgs::msg::PointArray>(
             this->get_parameter("intput_topic").as_string(), 10,
@@ -26,7 +26,7 @@ public:
 
 private:
     void point_callback(const localization_msgs::msg::PointArray::SharedPtr msg) {
-        auto clustered_data = DBSCANClustering(msg);
+        auto clustered_data = ClusterPoints(msg);
 
         std::vector<geometry_msgs::msg::Point> centroids;
         std::vector<double> radius;
@@ -44,70 +44,45 @@ private:
         obstacles.radius = radius;
 
         output_pub_->publish(obstacles);
+
+        RCLCPP_INFO(this->get_logger(), "obstacles: %ld", centroids.size());
     }
 
     std::vector<std::vector<geometry_msgs::msg::Point>>
-    DBSCANClustering(const localization_msgs::msg::PointArray::SharedPtr msg) {
+    ClusterPoints(const localization_msgs::msg::PointArray::SharedPtr msg) {
         const double eps = this->get_parameter("eps").as_double();
         const int min_points = this->get_parameter("min_points").as_int();
-        int cluster_id = 0;
 
-        std::vector<int> labels(msg->points.size(), -1); // -1: 未分類, 0: ノイズ, 1以上: クラスタID
-        std::vector<std::vector<int>> neighbors(msg->points.size());
+        std::vector<std::vector<geometry_msgs::msg::Point>> clusters;
 
-        // 近傍点を求める
-        for (size_t i = 0; i < msg->points.size(); ++i) {
-            for (size_t j = i + 1; j < msg->points.size(); ++j) {
-                double dist = std::hypot(msg->points[i].x - msg->points[j].x, msg->points[i].y - msg->points[j].y);
-                if (dist < eps) {
-                    neighbors[i].push_back(j);
-                    neighbors[j].push_back(i);
+        for (const auto &point : msg->points) {
+            bool added = false;
+
+            for (auto &cluster : clusters) {
+                for (const auto &p : cluster) {
+                    double dist = std::hypot(point.x - p.x, point.y - p.y);
+                    if (dist < eps) {
+                        cluster.push_back(point);
+                        added = true;
+                        break;
+                    }
                 }
+                if (added)
+                    break;
+            }
+
+            if (!added) {
+                clusters.push_back({point});
             }
         }
 
-        // DBSCANによるクラスタリング
-        for (size_t i = 0; i < msg->points.size(); ++i) {
-            if (labels[i] != -1)
-                continue;
+        clusters.erase(std::remove_if(clusters.begin(), clusters.end(),
+                                      [min_points](const std::vector<geometry_msgs::msg::Point> &c) {
+                                          return c.size() < static_cast<size_t>(min_points);
+                                      }),
+                       clusters.end());
 
-            if (neighbors[i].size() < min_points) {
-                labels[i] = 0;
-                continue;
-            }
-
-            cluster_id++;
-            labels[i] = cluster_id;
-            std::vector<int> expand_list = neighbors[i];
-
-            while (!expand_list.empty()) {
-                int index = expand_list.back();
-                expand_list.pop_back();
-
-                if (labels[index] == 0)
-                    labels[index] = cluster_id;
-
-                if (labels[index] != -1)
-                    continue;
-
-                labels[index] = cluster_id;
-
-                if (neighbors[index].size() >= min_points) {
-                    expand_list.insert(expand_list.end(), neighbors[index].begin(), neighbors[index].end());
-                }
-            }
-        }
-
-        std::vector<std::vector<geometry_msgs::msg::Point>> clustered_data(cluster_id);
-        for (int i = 1; i < cluster_id; i++) { // 0はノイズ
-            for (std::size_t j = 0; j < labels.size(); j++) {
-                if (labels[j] == i) {
-                    clustered_data[i].push_back(msg->points[j]);
-                }
-            }
-        }
-
-        return clustered_data;
+        return clusters;
     }
 
     geometry_msgs::msg::Point computeCentroid(const std::vector<geometry_msgs::msg::Point> &points) {

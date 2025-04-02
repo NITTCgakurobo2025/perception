@@ -10,7 +10,7 @@
 
 class ObstacleDetector : public rclcpp::Node {
 public:
-    ObstacleDetector() : Node("dbscan_cluster") {
+    ObstacleDetector() : Node("obstacle_detector") {
         this->declare_parameter<std::string>("intput_topic", "/R1/transformed_scan");
         this->declare_parameter<std::string>("output_topic", "/R1/obstacles");
         this->declare_parameter<double>("eps", 0.8);

@@ -22,6 +22,7 @@ def generate_launch_description():
                 'scan_topic': ['/', name, '/merged_scan'],
                 'transform_topic': ['/', name, '/scan_transform'],
                 'output_topic': ['/', name, '/transformed_scan'],
+                'wall_topic': ['/', name, '/detected_wall'],
             }]
         )
     ])

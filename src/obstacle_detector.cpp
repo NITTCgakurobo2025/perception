@@ -22,6 +22,7 @@ public:
     ObstacleDetector() : Node("obstacle_detector") {
         this->declare_parameter<std::string>("intput_topic", "/R1/transformed_scan");
         this->declare_parameter<std::string>("output_topic", "/R1/obstacles");
+        this->declare_parameter<std::string>("hull_topic", "/R1/obstacles_hull");
         this->declare_parameter<double>("eps", 0.8);
         this->declare_parameter<int>("min_points", 5);
 
@@ -31,7 +32,8 @@ public:
 
         output_pub_ = this->create_publisher<localization_msgs::msg::Obstacle>(
             this->get_parameter("output_topic").as_string(), 10);
-        obstacle_hull_pub_ = this->create_publisher<localization_msgs::msg::PointArray>("hull", 10);
+        obstacle_hull_pub_ = this->create_publisher<localization_msgs::msg::PointArray>(
+            this->get_parameter("hull_topic").as_string(), 10);
     }
 
 private:

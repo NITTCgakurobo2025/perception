@@ -1,11 +1,10 @@
 #include <algorithm>
 #include <cmath>
+#include <geometry_msgs/msg/point.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <string>
 #include <tuple>
 #include <vector>
-
-#include <geometry_msgs/msg/point.hpp>
-#include <rclcpp/rclcpp.hpp>
 
 #include "localization_msgs/msg/obstacle.hpp"
 #include "localization_msgs/msg/point_array.hpp"
@@ -20,34 +19,39 @@ class ObstacleDetector : public rclcpp::Node {
 
 public:
     ObstacleDetector() : Node("obstacle_detector") {
-        this->declare_parameter<std::string>("intput_topic", "/R1/transformed_scan");
-        this->declare_parameter<std::string>("output_topic", "/R1/obstacles");
-        this->declare_parameter<std::string>("hull_topic", "/R1/obstacles_hull");
+        this->declare_parameter<std::string>("input_topic",
+                                             "/transformed_scan");
+        this->declare_parameter<std::string>("output_topic", "/obstacles");
+        this->declare_parameter<std::string>("hull_topic", "/obstacles_hull");
         this->declare_parameter<double>("eps", 0.8);
         this->declare_parameter<int>("min_points", 5);
 
-        input_sub_ = this->create_subscription<localization_msgs::msg::PointArray>(
-            this->get_parameter("intput_topic").as_string(), 10,
-            std::bind(&ObstacleDetector::point_callback, this, std::placeholders::_1));
+        input_sub_ =
+            this->create_subscription<localization_msgs::msg::PointArray>(
+                this->get_parameter("input_topic").as_string(), 10,
+                std::bind(&ObstacleDetector::point_callback, this,
+                          std::placeholders::_1));
 
         output_pub_ = this->create_publisher<localization_msgs::msg::Obstacle>(
             this->get_parameter("output_topic").as_string(), 10);
-        obstacle_hull_pub_ = this->create_publisher<localization_msgs::msg::PointArray>(
-            this->get_parameter("hull_topic").as_string(), 10);
+        obstacle_hull_pub_ =
+            this->create_publisher<localization_msgs::msg::PointArray>(
+                this->get_parameter("hull_topic").as_string(), 10);
     }
 
 private:
-    void point_callback(const localization_msgs::msg::PointArray::SharedPtr msg) {
+    void point_callback(
+        const localization_msgs::msg::PointArray::SharedPtr msg) {
         auto clustered_data = ClusterPoints(msg);
 
         std::vector<Point> centers;
         std::vector<double> radii;
         std::vector<Point> obstacle_hulls;
         for (const auto &d : clustered_data) {
-            if (d.empty())
-                continue;
+            if (d.empty()) continue;
             auto [circle, hull] = computeMinRadius(d);
-            obstacle_hulls.insert(obstacle_hulls.end(), hull.begin(), hull.end());
+            obstacle_hulls.insert(obstacle_hulls.end(), hull.begin(),
+                                  hull.end());
             centers.emplace_back(circle.center);
             radii.emplace_back(circle.radius);
         }
@@ -66,7 +70,8 @@ private:
         RCLCPP_INFO(this->get_logger(), "obstacles: %ld", centers.size());
     }
 
-    std::vector<std::vector<Point>> ClusterPoints(const localization_msgs::msg::PointArray::SharedPtr msg) {
+    std::vector<std::vector<Point>> ClusterPoints(
+        const localization_msgs::msg::PointArray::SharedPtr msg) {
         const double eps = this->get_parameter("eps").as_double();
         const int min_points = this->get_parameter("min_points").as_int();
 
@@ -84,8 +89,7 @@ private:
                         break;
                     }
                 }
-                if (added)
-                    break;
+                if (added) break;
             }
 
             if (!added) {
@@ -93,16 +97,19 @@ private:
             }
         }
 
-        clusters.erase(std::remove_if(clusters.begin(), clusters.end(),
-                                      [min_points](const std::vector<Point> &c) {
-                                          return c.size() < static_cast<size_t>(min_points);
-                                      }),
-                       clusters.end());
+        clusters.erase(
+            std::remove_if(clusters.begin(), clusters.end(),
+                           [min_points](const std::vector<Point> &c) {
+                               return c.size() <
+                                      static_cast<size_t>(min_points);
+                           }),
+            clusters.end());
 
         return clusters;
     }
 
-    std::tuple<Circle, std::vector<Point>> computeMinRadius(const std::vector<Point> &points) {
+    std::tuple<Circle, std::vector<Point>> computeMinRadius(
+        const std::vector<Point> &points) {
         Circle circle;
         std::vector<Point> hull;
         if (points.empty() || points.size() == 1) {
@@ -127,7 +134,8 @@ private:
                     if (j == k) {
                         tmp_circle = computeCircumcircle(hull[i], hull[j]);
                     } else {
-                        tmp_circle = computeCircumcircle(hull[i], hull[j], hull[k]);
+                        tmp_circle =
+                            computeCircumcircle(hull[i], hull[j], hull[k]);
                     }
                     int count = countContainPoints(hull, tmp_circle);
                     if (count > max_points) {
@@ -150,21 +158,27 @@ private:
 
         std::vector<Point> sorted_points = points;
         std::sort(sorted_points.begin(), sorted_points.end(),
-                  [](const Point &a, const Point &b) { return (a.x < b.x) || (a.x == b.x && a.y < b.y); });
+                  [](const Point &a, const Point &b) {
+                      return (a.x < b.x) || (a.x == b.x && a.y < b.y);
+                  });
 
         std::vector<Point> hull;
         hull.reserve(points.size());
         for (const auto &p : sorted_points) {
-            while (hull.size() >= 2 && crossProduct(hull[hull.size() - 2], hull[hull.size() - 1], p) <= 0) {
+            while (hull.size() >= 2 &&
+                   crossProduct(hull[hull.size() - 2], hull[hull.size() - 1],
+                                p) <= 0) {
                 hull.pop_back();
             }
             hull.emplace_back(p);
         }
 
         size_t lower_hull_size = hull.size();
-        for (auto it = sorted_points.rbegin(); it != sorted_points.rend(); ++it) {
+        for (auto it = sorted_points.rbegin(); it != sorted_points.rend();
+             ++it) {
             while (hull.size() > lower_hull_size &&
-                   crossProduct(hull[hull.size() - 2], hull[hull.size() - 1], *it) <= 0) {
+                   crossProduct(hull[hull.size() - 2], hull[hull.size() - 1],
+                                *it) <= 0) {
                 hull.pop_back();
             }
             hull.emplace_back(*it);
@@ -223,7 +237,8 @@ private:
 
         // 鋭角三角形の場合
         // 外接円を返す
-        double D = 2.0 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+        double D =
+            2.0 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
 
         if (D == 0.0) {
             circle.center.x = circle.center.y = circle.center.z = 0.0;
@@ -232,22 +247,27 @@ private:
             return circle;
         }
 
-        circle.center.x = ((a.x * a.x + a.y * a.y) * (b.y - c.y) + (b.x * b.x + b.y * b.y) * (c.y - a.y) +
+        circle.center.x = ((a.x * a.x + a.y * a.y) * (b.y - c.y) +
+                           (b.x * b.x + b.y * b.y) * (c.y - a.y) +
                            (c.x * c.x + c.y * c.y) * (a.y - b.y)) /
                           D;
-        circle.center.y = ((a.x * a.x + a.y * a.y) * (c.x - b.x) + (b.x * b.x + b.y * b.y) * (a.x - c.x) +
+        circle.center.y = ((a.x * a.x + a.y * a.y) * (c.x - b.x) +
+                           (b.x * b.x + b.y * b.y) * (a.x - c.x) +
                            (c.x * c.x + c.y * c.y) * (b.x - a.x)) /
                           D;
         circle.center.z = 0.0;
-        circle.radius = std::hypot(a.x - circle.center.x, a.y - circle.center.y);
+        circle.radius =
+            std::hypot(a.x - circle.center.x, a.y - circle.center.y);
 
         return circle;
     }
 
-    int countContainPoints(const std::vector<Point> &points, const Circle &circle) {
+    int countContainPoints(const std::vector<Point> &points,
+                           const Circle &circle) {
         int count = 0;
         for (const auto &p : points) {
-            double dist = std::hypot(p.x - circle.center.x, p.y - circle.center.y);
+            double dist =
+                std::hypot(p.x - circle.center.x, p.y - circle.center.y);
             if (dist <= circle.radius) {
                 count++;
             }
@@ -255,9 +275,11 @@ private:
         return count;
     }
 
-    rclcpp::Subscription<localization_msgs::msg::PointArray>::SharedPtr input_sub_;
+    rclcpp::Subscription<localization_msgs::msg::PointArray>::SharedPtr
+        input_sub_;
     rclcpp::Publisher<localization_msgs::msg::Obstacle>::SharedPtr output_pub_;
-    rclcpp::Publisher<localization_msgs::msg::PointArray>::SharedPtr obstacle_hull_pub_;
+    rclcpp::Publisher<localization_msgs::msg::PointArray>::SharedPtr
+        obstacle_hull_pub_;
 };
 
 int main(int argc, char **argv) {

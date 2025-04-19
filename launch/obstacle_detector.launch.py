@@ -16,12 +16,13 @@ def generate_launch_description():
         Node(
             package='perception',
             executable='obstacle_detector',
-            name=[name, '_obstacle_detector'],
+            name='obstacle_detector',
+            namespace=name,
             output='screen',
             parameters=[{
-                'input_topic': ['/', name, '/transformed_scan'],
-                'output_topic': ['/', name, '/obstacles'],
-                'hull_topic': ['/', name, '/obstacles_hull'],
+                'input_topic': 'transformed_scan',
+                'output_topic': 'obstacles',
+                'hull_topic': 'obstacles_hull',
             }]
         )
     ])
